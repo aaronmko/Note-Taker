@@ -1,73 +1,78 @@
-const PORT = process.env.PORT || 3001;
-const fs = require('fs');
-const path = require('path');
-const express = require('express');
-const app = express();
-const allNotes = require('./db/db.json');
+const fs = require('fs')
+const path = require('path')
+const express = require('express')
+const app = express()
+const PORT = process.env.PORT || 3000
+const db = require('./db/db.json')
 
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
-app.use(express.static('public'));
+//Allows all notes to have a unique ID
+const { v4: uuidv4 } = require('uuid');
+
+//Allows public folder to be unblocked
+app.use(express.static('public'))
+app.use(express.json())
+
+//API Routes
+// GET /api/notes should read the db.json file and return all saved notes as JSON.
 app.get('/api/notes', (req, res) => {
-    res.json(allNotes.slice(1));
-});
+    fs.readFile('./db/db.json', (err, data) => {
+        ///error logging
+        if (err) throw err;
+        let dbData = JSON.parse(data);
+        //Returns new database
+        res.json(dbData)
+    });   
+})
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, './public/index.html'));
-});
-
-app.get('/notes', (req, res) => {
-    res.sendFile(path.join(__dirname, './public/notes.html'));
-});
-
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, './public/index.html'));
-});
-
-function createNewNote(body, notesArray) {
-    const newNote = body;
-    if (!Array.isArray(notesArray))
-    notesArray = [];
-
-    if (notesArray.length === 0)
-    notesArray.push(0);
-
-    body.id = notesArray[0];
-    notesArray[0]++;
-
-    notesArray.push(newNote);
-    fs.writeFileSync(
-        path.join(__dirname, './db/db.json'),
-        );
-        return newNote;
-    }
-
+//POST 
+///api/notes receives a new note to save on the request body and add it to db.json, then returns new note to the client.
 app.post('/api/notes', (req, res) => {
-    const newNote = createNewNote(req.body, allNotes);
-    res.json(newNote);
-});
+    //grabs notes from body of request
+    const newNote = req.body
 
-function deleteNote(id, notesArray) {
-    for (let i = 0; i < notesArray.length; i++) {
-        let note = notesArray[i];
+    //gives each note a random ID
+    newNote.id = uuidv4()
 
-        if (note.id == id) {
-            notesArray.splice(i, 1);
-            fs.writeFileSync(
-                path.join(__dirname, './db/db.json'),
-                JSON.stringify(notesArray, null, 2)
-            );
+    //adds the note object to the array
+    db.push(newNote)
 
-            break;
-        }
-    }
-}
+    //update the json file with the new object
+    fs.writeFileSync('./db/db.json', JSON.stringify(db))
 
+    //responds with the note object used
+    res.json(db)
+})
+
+
+//DELETE
+// notes when the button is clicked by removing the note from db.json, saving and showing the updated database on the front end.
 app.delete('/api/notes/:id', (req, res) => {
-    deleteNote(req.params.id, allNotes);
-    res.json(true);
-});
+    const newDb = db.filter((note) =>
+        note.id !== req.params.id)
 
-app.listen(PORT, () => {
-    console.log(`API server now on port ${PORT}!`);
-});
+    // update the db.json file to reflect the modified notes array
+    fs.writeFileSync('./db/db.json', JSON.stringify(newDb))
+
+    // send that removed note object back to user
+    readFile.json(newDb)
+})
+
+//HTML Routes
+//Home
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'))
+})
+
+//Notes
+app.get('/notes', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'notes.html'))
+})
+
+//Wildcard Route
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'))
+})
+
+//App listens with front end on this port
+app.listen(PORT, () =>
+    console.log(`App listening on ${PORT}`))
